@@ -377,7 +377,7 @@ class UnverifiedBlockServer implements Runnable {
 				
 				BlockRecord blockRecord = this.UnMarshallJSON(data);
 
-				System.out.println("Unverified Block Worker Put Block in priority queue: " + data + "\n");
+				//System.out.println("Unverified Block Worker Put Block in priority queue: " + data + "\n");
 				queue.put(blockRecord);
 			} 
 			catch (Exception e) {
@@ -387,16 +387,14 @@ class UnverifiedBlockServer implements Runnable {
 		
 		private BlockRecord UnMarshallJSON(String data){
 			Gson gson = new Gson();
-			BlockRecord blockRecordIn = null;
 			
-			System.out.println("Unverified Block Server Incoming Block\n");
 			// Read and convert JSON File to a Java Object:
-			blockRecordIn = gson.fromJson(data, BlockRecord.class);
+			BlockRecord blockRecordIn = gson.fromJson(data, BlockRecord.class);
 	  
 			// Print the blockRecord:
-			System.out.println(blockRecordIn);
-			System.out.println("Name is: " + blockRecordIn.getFname() + " " + blockRecordIn.getLname());
-			System.out.println("String UUID: " + blockRecordIn.getBlockID() + " Stored-binaryUUID: " + blockRecordIn.getUUID());
+			System.out.println("Unverified Block Server: Incoming Block " + blockRecordIn + 
+			"\nName is: " + blockRecordIn.getFname() + " " + blockRecordIn.getLname() + 
+			"\nString UUID: " + blockRecordIn.getBlockID() + " Stored-binaryUUID: " + blockRecordIn.getUUID() + "\n");
 			
 			return blockRecordIn;
 		}
@@ -427,7 +425,7 @@ class UnverifiedBlockConsumer implements Runnable {
 		this.PID = PID;
 	}
 	
-	private BlockRecord UnMarshallJSON(String data){
+	/*private BlockRecord UnMarshallJSON(String data){
 		Gson gson = new Gson();
 		BlockRecord blockRecordIn = null;
 
@@ -442,7 +440,7 @@ class UnverifiedBlockConsumer implements Runnable {
 		System.out.println("String UUID: " + blockRecordIn.getBlockID() + " Stored-binaryUUID: " + blockRecordIn.getUUID());
 		
 		return blockRecordIn;
-	}
+	}*/
 
 	public void run(){
 		BlockRecord data;
@@ -506,11 +504,12 @@ class BlockchainWorker extends Thread {
 			}
 			
 			
-			
+			System.out.println("Blockchain Server Received Updated Blockchain Ledger.");
+			System.out.println("Total Blocks: " + Blockchain.numBlocks + "\n");
 			Blockchain.blockchain = data; // Would normally have to check first for winner before replacing.
-			System.out.println("         --NEW BLOCKCHAIN--\n" + Blockchain.blockchain + "\n\n");
+			//System.out.println("         --NEW BLOCKCHAIN--\n" + Blockchain.blockchain + "\n\n");
 			sock.close();
-			System.out.println("Total Blocks: " + Blockchain.numBlocks);
+			
 			
 			//if first process, write JSON to disk
 			if(this.PID == 0) {
@@ -518,6 +517,7 @@ class BlockchainWorker extends Thread {
 				// Write the JSON object to a file:
 				try (FileWriter writer = new FileWriter("blockRecord.json")) {
 					gson.toJson(data, writer);
+					System.out.println("Blockchain Ledger Written to Disk.\n");
 				} 
 				catch (IOException e) {
 					e.printStackTrace();
@@ -562,7 +562,7 @@ public class Blockchain {
 	static String serverName = "localhost";
 	static String blockchain = "";//"[First block]";
 	static String pPrevHash = "Head Block";
-	static final int numProcesses = 1; // Set this to match your batch execution file that starts N processes with args 0,1,2,...N
+	static final int numProcesses = 3; // Set this to match your batch execution file that starts N processes with args 0,1,2,...N
 	static int PID;
 
 	//Multicast to each process
@@ -585,7 +585,7 @@ public class Blockchain {
 			String current;
 			while(iterator.hasNext()){
 				current = iterator.next();
-				System.out.println("BlockFramework multicasting unverified block string to unverified block servers.\n" + current + "\n");
+				//System.out.println("BlockFramework multicasting unverified block string to unverified block servers.\n" + current + "\n");
 				current = current.replace("\n", "--linebreak--");
 				Multicast(Ports.UnverifiedBlockServerPort, "PID: " + Blockchain.PID + current);
 			}
@@ -599,7 +599,7 @@ public class Blockchain {
 		Socket sock;
 		PrintStream toServer;
 		for(int i=0; i< numProcesses; i++){// Send a sample unverified block to each server
-			sock = new Socket(serverName, port + (i));
+			sock = new Socket(serverName, port + i);
 			toServer = new PrintStream(sock.getOutputStream());
 			toServer.println(output);
 			toServer.flush();

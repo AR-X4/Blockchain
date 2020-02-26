@@ -4,3 +4,4 @@ BlockchainSample.java
 *.json
 checklist-block.html
 gson-2.8.2.jar
+runBlockchain.bat
