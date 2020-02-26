@@ -97,10 +97,6 @@ class PublicKeyServer implements Runnable {
 
 class BlockRecord implements Comparable {
   
-  //check this
-  private String BlockData;//??
-  
-  //-----------------------------------
   private String Timestamp;
   private String BlockID;
   private String VerificationProcessID;
@@ -109,6 +105,7 @@ class BlockRecord implements Comparable {
   private String SignedSHA256;
   private String SHA256String;
   private String CreatingProcess;
+  private String BlockData;
   private String Fname;
   private String Lname;
   private String SSNum;
@@ -116,7 +113,7 @@ class BlockRecord implements Comparable {
   private String Diag;
   private String Treat;
   private String Rx;
-  private String WinningHash;//make getter/ setter
+  private String WinningHash;//implement this
 
   //-----accessor methods-----
   public String getPreviousHash() {return this.PreviousHash;}
@@ -325,29 +322,25 @@ class WorkB {
 	}
 
 	//adjust - refactor 
-	public static BlockRecord verifyBlock(BlockRecord inputBlock, int PID, String previousHash) throws Exception {
+	public static BlockRecord Verify(BlockRecord inputBlock, int PID, String previousHash) throws Exception {
 		String concatString;  // Random seed string concatenated with the existing data
 		String StringOut; // Will contain the new SHA256 string converted to HEX and printable.
 		int workNumber;
 
 		inputBlock.setPreviousHash(previousHash);
-
+		Gson gson = new GsonBuilder().setPrettyPrinting().create();
+		
 		try {
 			for(int i=1; i<20; i++) { // Limit how long we try for this example.
 				randString = randomAlphaNumeric(8);
 
 				inputBlock.setBlockData(randString);
-				concatString = inputBlock.toString().replace("\n", "").replace(" ", "");
+				//concatString = inputBlock.toString().replace("\n", "").replace(" ", "");
+				concatString = gson.toJson(inputBlock);
 
-				// Get the hash value
-				//MessageDigest MD = MessageDigest.getInstance("SHA-256");
-				//byte[] bytesHash = MD.digest(concatString.getBytes("UTF-8"));
-
-				// Turn into a string of hex values
-				//StringOut = DatatypeConverter.printHexBinary(bytesHash);
 				StringOut = signSHA256(concatString);
 				
-				
+				System.out.println("Trying to Verify Input Block...\n");
 				System.out.println("Hash is: " + StringOut);
 
 				// Between 0000 (0) and FFFF (65535)
@@ -363,7 +356,7 @@ class WorkB {
 					System.out.println("The seed (puzzle answer) was: " + randString);
 					inputBlock.setSHA256String(StringOut);
 					
-					String hashInput = inputBlock.getSHA256String() + String.valueOf(PID);
+					String hashInput = inputBlock.getSHA256String() + PID;
 					
 					inputBlock.setSignedSHA256(signSHA256(hashInput));
 					return inputBlock;
@@ -516,7 +509,7 @@ class UnverifiedBlockConsumer implements Runnable {
 				}
 				
 				//Do work
-				VerifiedBlock = WorkB.verifyBlock(data, this.PID, pPrevHash);
+				VerifiedBlock = WorkB.Verify(data, this.PID, pPrevHash);
 				VerifiedBlock.setVerificationProcessID(Integer.toString(this.PID));
 				//Puzzle solzed
 
