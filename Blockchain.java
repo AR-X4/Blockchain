@@ -571,13 +571,9 @@ public class Blockchain {
 			//-------MultiCast Keys----------
 			System.out.println("BlockFramework multicasting process key to public key servers.\n\n");
 			String fakeKey = ("FakeKeyProcess: " + Blockchain.PID);
-			Multicast(Ports.KeyServerPort, fakeKey);
+			Multicast(Ports.KeyServerPortBase, fakeKey);
 
 			Thread.sleep(1000); // wait for keys to settle, normally would wait for an ack
-
-			//-------MultiCast JSON BlockChain---------
-			System.out.println("BlockFramework multicasting blockchain string to blockchain servers.\n\n");
-			Multicast(Ports.BlockchainServerPort, blockchain);
 
 			//-------MultiCast UV Blocks----------
 			LinkedList<String> JsonRecord = BlockInput.GetJsonListString(PID);
@@ -587,8 +583,14 @@ public class Blockchain {
 				current = iterator.next();
 				//System.out.println("BlockFramework multicasting unverified block string to unverified block servers.\n" + current + "\n");
 				current = current.replace("\n", "--linebreak--");
-				Multicast(Ports.UnverifiedBlockServerPort, "PID: " + Blockchain.PID + current);
+				Multicast(Ports.UnverifiedBlockServerPortBase, "PID: " + Blockchain.PID + current);
 			}
+			
+			Thread.sleep(1000); // wait for keys to settle, normally would wait for an ack
+
+			//-------MultiCast JSON BlockChain---------
+			System.out.println("BlockFramework multicasting blockchain string to blockchain servers.\n\n");
+			Multicast(Ports.BlockchainServerPortBase, blockchain);
 		} 
 		catch (Exception e) {
 			e.printStackTrace();
