@@ -168,7 +168,6 @@ class BlockRecord implements Comparable {
   public void setWinningHash (String WH){this.WinningHash = WH;}
 
   
-
   @Override
   public int compareTo(Object o) {
 
@@ -285,7 +284,6 @@ class BlockInput {
 	}
 }
 
-//adjust
 class WorkB {
 
 	private static final String ALPHA_NUMERIC_STRING = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -322,12 +320,12 @@ class WorkB {
 	}
 
 	//adjust - refactor 
-	public static BlockRecord Verify(BlockRecord inputBlock, int PID, String previousHash) throws Exception {
+	public static BlockRecord Verify(BlockRecord inputBlock, int PID) throws Exception {
 		String concatString;  // Random seed string concatenated with the existing data
 		String StringOut; // Will contain the new SHA256 string converted to HEX and printable.
 		int workNumber;
 
-		inputBlock.setPreviousHash(previousHash);
+		inputBlock.setPreviousHash(Blockchain.pPrevHash);
 		Gson gson = new GsonBuilder().setPrettyPrinting().create();
 		
 		try {
@@ -353,10 +351,12 @@ class WorkB {
 				}
 				if (workNumber < 20000) {
 					System.out.format("%d IS less than 20,000 so puzzle solved!\n", workNumber);
-					System.out.println("The seed (puzzle answer) was: " + randString);
+					System.out.println("The seed (puzzle answer) was: " + randString + "\n");
 					inputBlock.setSHA256String(StringOut);
+					Blockchain.pPrevHash = StringOut;
 					
-					String hashInput = inputBlock.getSHA256String() + PID;
+					//String hashInput = inputBlock.getSHA256String() + PID;
+					String hashInput = StringOut + PID;
 					
 					inputBlock.setSignedSHA256(signSHA256(hashInput));
 					return inputBlock;
@@ -468,22 +468,12 @@ class UnverifiedBlockConsumer implements Runnable {
 		
 		return blockRecordIn;
 	}
-	
-	/*private LinkedList<BlockRecord> ConvertJsonToList(String blockchain) {
-		LinkedList<BlockRecord> BlockList = new LinkedList<BlockRecord>();
-		if(blockchain != null){
-			Gson gson = new Gson();
-			Type ConversionType = new TypeToken<LinkedList<BlockRecord>>(){}.getType();
-			BlockList = gson.fromJson(blockchain, ConversionType);
-		}
-		return BlockList;
-	}	*/
 
 	public void run(){
 		BlockRecord data;
 		PrintStream toServer;
 		Socket sock;
-		String pPrevHash;
+		//String pPrevHash;
 		BlockRecord VerifiedBlock;
 		String NewBlockchain;
 
@@ -491,30 +481,34 @@ class UnverifiedBlockConsumer implements Runnable {
 		try{
 			while(true){ // Consume from the incoming queue. Do the work to verify. Mulitcast new blockchain
 				data = queue.take(); // Will blocked-wait on empty queue
-				System.out.println("Consumer got unverified: " + data + "\n");
+				System.out.println("Consumer Got Unverified Block: " + data + "\n");
 				//System.out.println("TEST " + Blockchain.blockchain + "\n");
 				
-				//LinkedList<BlockRecord> BlockList = ConvertJsonToList(Blockchain.blockchain);
-				LinkedList<BlockRecord> BlockList = new LinkedList<BlockRecord>();
-				Gson gson = new Gson();
 				
-				if(Blockchain.blockchain.length() > 0){
-					Type ConversionType = new TypeToken<LinkedList<BlockRecord>>(){}.getType();
-					BlockList = gson.fromJson(Blockchain.blockchain, ConversionType);
+				LinkedList<BlockRecord> BlockList = new LinkedList<BlockRecord>();
+				
+				Gson gson = new GsonBuilder().setPrettyPrinting().create();
+				
+				//if(Blockchain.blockchain.length() > 0){
+					//Type ConversionType = new TypeToken<LinkedList<BlockRecord>>(){}.getType();
+					//System.out.println("TEST " + Blockchain.blockchain + "\n");
+					//System.out.println("TEST " + ConversionType + "\n");
 					
-					pPrevHash = BlockList.get(0).getSHA256String();
-				}
-				else{
-					pPrevHash = "Head Block";	
-				}
+					//BlockList = gson.fromJson(Blockchain.blockchain, ConversionType);
+					//BlockList = gson.fromJson(Blockchain.blockchain, new TypeToken<LinkedList<BlockRecord>>(){}.getType());
+					//pPrevHash = BlockList.get(0).getSHA256String();
+				//}
+				//else{
+					//pPrevHash = "Head Block";	
+				//}
 				
 				//Do work
-				VerifiedBlock = WorkB.Verify(data, this.PID, pPrevHash);
+				VerifiedBlock = WorkB.Verify(data, this.PID);
 				VerifiedBlock.setVerificationProcessID(Integer.toString(this.PID));
 				//Puzzle solzed
 
 				//Add new block to front of blockchain
-				gson = new GsonBuilder().setPrettyPrinting().create();
+				
 				NewBlockchain = gson.toJson(VerifiedBlock) + Blockchain.blockchain;
 				//NewBlockchain = VerifiedBlock.toString().replace(" ", "") + Blockchain.blockchain;
 				
@@ -608,6 +602,7 @@ public class Blockchain {
 	public static final int q_len = 6;
 	static String serverName = "localhost";
 	static String blockchain = "";//"[First block]";
+	static String pPrevHash = "Head Block";
 	static final int numProcesses = 1; // Set this to match your batch execution file that starts N processes with args 0,1,2,...N
 	static int PID;
 
