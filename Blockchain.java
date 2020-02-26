@@ -26,7 +26,6 @@ javac -cp "gson-2.8.2.jar" Blockchain.java
 java -cp ".;gson-2.8.2.jar" Blockchain
 
 -----------------------------------------------------------------------------------------------------*/
-  
 
 import java.util.*;
 import java.io.*;
@@ -37,7 +36,6 @@ import java.security.*;
 
 import java.time.Instant;
 import com.google.gson.*;
-import com.google.gson.reflect.TypeToken;
 
 //don't touch
 class Ports {
@@ -193,8 +191,6 @@ class BlockInput {
 	private static final int iDIAG = 4;
 	private static final int iTREAT = 5;
 	private static final int iRX = 6;
-
-	//replace JSON
 	
 	public static LinkedList<String> GetJsonListString(int pid) throws Exception {
 
@@ -217,7 +213,7 @@ class BlockInput {
 		}
 
 		System.out.println("Using input file: " + FILENAME);
-
+		System.out.println("Names read into a linked list from the data input file:\n");
 		try{
 			BufferedReader br = new BufferedReader(new FileReader(FILENAME));
 			String[] tokens = new String[10];
@@ -254,26 +250,10 @@ class BlockInput {
 				
 				String jsonRecord = gson.toJson(BR);
 				BlockList.add(jsonRecord);
-				//BlockList.add(BR);
+				
+				System.out.println(tokens[iFNAME] + " " + tokens[iLNAME]);
 			}
-			System.out.println(BlockList.size() + " records read.\n");
-			//System.out.println("Names read into a linked list from the data input file:\n");
-			
-			//-------print blockchain list names--------
-			//Iterator<BlockRecord> iterator = BlockList.iterator();
-			//BlockRecord current;
-			//while(iterator.hasNext()){
-				//current = iterator.next();
-				//System.out.println(current.getFname() + " " + current.getLname());
-			//}
-			//System.out.println("\n\n");
-
-			//-------create JSON string from list-----------
-			//Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    
-			// Convert the Java object to a JSON String:
-			//String json = gson.toJson(BlockList);
-			//System.out.println("\nJSON marshaled list is:\n" + json);
+			System.out.println("\n" + BlockList.size() + " records read.\n");
 
 			return BlockList;
 		} 
@@ -300,13 +280,12 @@ class WorkB {
 	}
 
 	//adjust - refactor
-	private static String signSHA256(String input) throws Exception {
+	private static String signData(String input) throws Exception {
 
 		MessageDigest MD = MessageDigest.getInstance("SHA-256");
 		byte[] byteData = MD.digest(input.getBytes("UTF-8"));
 
 		// Turn into a string of hex values
-		
 		String SHA256String = "";
 		
 		StringBuffer sb = new StringBuffer();
@@ -336,7 +315,7 @@ class WorkB {
 				//concatString = inputBlock.toString().replace("\n", "").replace(" ", "");
 				concatString = gson.toJson(inputBlock);
 
-				StringOut = signSHA256(concatString);
+				StringOut = signData(concatString);
 				
 				System.out.println("Trying to Verify Input Block...\n");
 				System.out.println("Hash is: " + StringOut);
@@ -358,7 +337,7 @@ class WorkB {
 					//String hashInput = inputBlock.getSHA256String() + PID;
 					String hashInput = StringOut + PID;
 					
-					inputBlock.setSignedSHA256(signSHA256(hashInput));
+					inputBlock.setSignedSHA256(signData(hashInput));
 					return inputBlock;
 				}
 				// Here is where you would periodically check to see if the blockchain has been updated
@@ -372,7 +351,6 @@ class WorkB {
 		return null;
 	}
 }
-
 
 class UnverifiedBlockServer implements Runnable {
 	BlockingQueue<BlockRecord> queue;
@@ -441,7 +419,6 @@ class UnverifiedBlockServer implements Runnable {
 	}
 }
 
-//Adjust
 class UnverifiedBlockConsumer implements Runnable {
 	private BlockingQueue<BlockRecord> queue;
 	private int PID;
@@ -454,12 +431,10 @@ class UnverifiedBlockConsumer implements Runnable {
 		Gson gson = new Gson();
 		BlockRecord blockRecordIn = null;
 
-		
 		System.out.println("Unverified Block Server Incoming Block\n");
 		// Read and convert JSON File to a Java Object:
 		blockRecordIn = gson.fromJson(data, BlockRecord.class);
 			
-	  
 		// Print the blockRecord:
 		System.out.println(blockRecordIn);
 		System.out.println("Name is: " + blockRecordIn.getFname() + " " + blockRecordIn.getLname());
@@ -473,7 +448,6 @@ class UnverifiedBlockConsumer implements Runnable {
 		BlockRecord data;
 		PrintStream toServer;
 		Socket sock;
-		//String pPrevHash;
 		BlockRecord VerifiedBlock;
 		String NewBlockchain;
 
@@ -482,25 +456,6 @@ class UnverifiedBlockConsumer implements Runnable {
 			while(true){ // Consume from the incoming queue. Do the work to verify. Mulitcast new blockchain
 				data = queue.take(); // Will blocked-wait on empty queue
 				System.out.println("Consumer Got Unverified Block: " + data + "\n");
-				//System.out.println("TEST " + Blockchain.blockchain + "\n");
-				
-				
-				LinkedList<BlockRecord> BlockList = new LinkedList<BlockRecord>();
-				
-				Gson gson = new GsonBuilder().setPrettyPrinting().create();
-				
-				//if(Blockchain.blockchain.length() > 0){
-					//Type ConversionType = new TypeToken<LinkedList<BlockRecord>>(){}.getType();
-					//System.out.println("TEST " + Blockchain.blockchain + "\n");
-					//System.out.println("TEST " + ConversionType + "\n");
-					
-					//BlockList = gson.fromJson(Blockchain.blockchain, ConversionType);
-					//BlockList = gson.fromJson(Blockchain.blockchain, new TypeToken<LinkedList<BlockRecord>>(){}.getType());
-					//pPrevHash = BlockList.get(0).getSHA256String();
-				//}
-				//else{
-					//pPrevHash = "Head Block";	
-				//}
 				
 				//Do work
 				VerifiedBlock = WorkB.Verify(data, this.PID);
@@ -508,9 +463,10 @@ class UnverifiedBlockConsumer implements Runnable {
 				//Puzzle solzed
 
 				//Add new block to front of blockchain
-				
+				Gson gson = new GsonBuilder().setPrettyPrinting().create();
 				NewBlockchain = gson.toJson(VerifiedBlock) + Blockchain.blockchain;
 				//NewBlockchain = VerifiedBlock.toString().replace(" ", "") + Blockchain.blockchain;
+				Blockchain.numBlocks++;
 				
 				for(int i = 0; i < Blockchain.numProcesses; i++){ // send to each process in group, including us:
 					sock = new Socket(Blockchain.serverName, Ports.BlockchainServerPortBase + i);
@@ -530,7 +486,6 @@ class UnverifiedBlockConsumer implements Runnable {
 	}
 }
 
-//Adjust
 // Incoming proposed replacement blockchains. Compare to existing. Replace if winner:
 class BlockchainWorker extends Thread {
 	private Socket sock;
@@ -550,9 +505,12 @@ class BlockchainWorker extends Thread {
 				data = data + data2;
 			}
 			
+			
+			
 			Blockchain.blockchain = data; // Would normally have to check first for winner before replacing.
 			System.out.println("         --NEW BLOCKCHAIN--\n" + Blockchain.blockchain + "\n\n");
 			sock.close();
+			System.out.println("Total Blocks: " + Blockchain.numBlocks);
 			
 			//if first process, write JSON to disk
 			if(this.PID == 0) {
@@ -600,13 +558,13 @@ class BlockchainServer implements Runnable {
 public class Blockchain {
 
 	public static final int q_len = 6;
+	public static int numBlocks = 0;
 	static String serverName = "localhost";
 	static String blockchain = "";//"[First block]";
 	static String pPrevHash = "Head Block";
 	static final int numProcesses = 1; // Set this to match your batch execution file that starts N processes with args 0,1,2,...N
 	static int PID;
 
-	//maybe refactor this
 	//Multicast to each process
 	public void MultiSend(){
 		try{
@@ -637,7 +595,6 @@ public class Blockchain {
 		}
 	}
 
-	
 	public static void Multicast(int port, String output) throws IOException {
 		Socket sock;
 		PrintStream toServer;
