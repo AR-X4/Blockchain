@@ -297,7 +297,6 @@ class WorkB {
 		return SHA256String;
 	}
 
-	//adjust - refactor 
 	public static BlockRecord Verify(BlockRecord inputBlock, int PID) throws Exception {
 		String concatString;  // Random seed string concatenated with the existing data
 		String StringOut; // Will contain the new SHA256 string converted to HEX and printable.
@@ -308,13 +307,11 @@ class WorkB {
 		
 		try {
 			for(int i=1; i<20; i++) { // change this to only solve while still unverified
-			//while(BlockchainCopy == Blockchain.blockchain){
+			//while blockchain doesn't contains current ID
 				randString = randomAlphaNumeric(8);
 
 				inputBlock.setBlockData(randString);
-				//concatString = inputBlock.toString().replace("\n", "").replace(" ", "");
 				concatString = gson.toJson(inputBlock);
-
 				StringOut = signData(concatString);
 				
 				System.out.println("Trying to Verify Input Block...\n");
@@ -326,17 +323,13 @@ class WorkB {
 				System.out.println("First 16 bits in Hex and Decimal: " + StringOut.substring(0,4) +" and " + workNumber);
 				
 				String tmp = inputBlock.getBlockID();
-				
 				if(Blockchain.blockchain.contains(tmp)){
 					System.out.println("\n------VERIFICATION ABORTED------\n");
 					return null;
 				}
-
-
-				//else if (!(workNumber < 20000)) {  // lower number = more work.
-					//System.out.format("%d is not less than 20,000 so we did not solve the puzzle\n\n", workNumber);
-				//}
-				
+				else if (!(workNumber < 20000)) {  // lower number = more work.
+					System.out.format("%d is not less than 20,000 so we did not solve the puzzle\n\n", workNumber);
+				}
 				else if (workNumber < 20000) {
 					System.out.format("%d IS less than 20,000 so puzzle solved!\n", workNumber);
 					System.out.println("The seed (puzzle answer) was: " + randString + "\n");
@@ -349,12 +342,6 @@ class WorkB {
 					inputBlock.setSignedSHA256(signData(hashInput));
 					return inputBlock;
 				}
-				// Here is where you would periodically check to see if the blockchain has been updated
-				//get blockchain linked list
-				//iterate and see if current blockID is in linked list
-				//break if it is
-				
-				
 				Thread.sleep(1000);
 			}
 		} 
@@ -460,7 +447,7 @@ class UnverifiedBlockConsumer implements Runnable {
 					//Add new block to front of blockchain
 					Gson gson = new GsonBuilder().setPrettyPrinting().create();
 					NewBlockchain = gson.toJson(VerifiedBlock) + Blockchain.blockchain;
-					//NewBlockchain = VerifiedBlock.toString().replace(" ", "") + Blockchain.blockchain;
+					
 					Blockchain.numBlocksVerified++;
 				
 					for(int i = 0; i < Blockchain.numProcesses; i++){ // send to each process in group, including us:
@@ -501,13 +488,11 @@ class BlockchainWorker extends Thread {
 				data = data + data2;
 			}
 			
-			
 			System.out.println("Blockchain Server Received Updated Blockchain Ledger.");
-			System.out.println("Total Verified Blocks: " + Blockchain.numBlocksVerified + "\n");
+			//System.out.println("Total Verified Blocks: " + Blockchain.numBlocksVerified + "\n");
 			Blockchain.blockchain = data; // Would normally have to check first for winner before replacing.
-			//System.out.println("         --NEW BLOCKCHAIN--\n" + Blockchain.blockchain + "\n\n");
-			sock.close();
 			
+			sock.close();
 			
 			//if first process, write JSON to disk
 			if(this.PID == 0) {
@@ -630,6 +615,31 @@ public class Blockchain {
 
 		new Thread(new UnverifiedBlockConsumer(queue, PID)).start();// Start consuming the queued-up unverified blocks
 		
+		//-----Console Commands-----
+		BufferedReader in = new BufferedReader(new InputStreamReader(System.in));
+		char input;
+		while(true){
+			try{
+				input = (char)in.read();
+				if(input == 'C'){
+					//Print validation credit of each process
+					System.out.println("Number of Verified Blocks: " + numBlocksVerified + "\n");
+				}
+				else if(input == 'R'){
+					//?????
+				}
+				else if(input == 'V'){
+					//Validiate entire blockchain
+				}
+				else if(input == 'L'){
+					String tmp = blockchain.replace("}", "\n\n");
+					tmp = tmp.replace("{", "");
+					tmp = tmp.replace(",", "\n");
+					System.out.println(tmp);
+				}
+			}
+			catch(Exception e){}
+		}
 	}
 }
 
