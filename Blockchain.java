@@ -66,6 +66,7 @@ class PublicKeyWorker extends Thread {
 			BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream())); 
 			String data = in.readLine();
 			System.out.println("Public Key Server Got Key: " + data + "\n");
+			Blockchain.PublicKeys.add(data);
 			sock.close();
 		} 	
 		catch (IOException e) {
@@ -75,7 +76,7 @@ class PublicKeyWorker extends Thread {
 }
 
 class PublicKeyServer implements Runnable {
-  //public ProcessBlock[] PBlock = new ProcessBlock[3]; // One block to store info for each process.
+  //public ProcessBlock[] PBlock = new ProcessBlock[3]; // One block to store info for each process.??
 
 	public void run() {
 		
@@ -112,7 +113,6 @@ class BlockRecord implements Comparable {
   private String Diag;
   private String Treat;
   private String Rx;
-  private String WinningHash;//implement this
 
   //-----accessor methods-----
   public String getPreviousHash() {return this.PreviousHash;}
@@ -162,9 +162,6 @@ class BlockRecord implements Comparable {
 
   public String getGRx() {return Rx;}
   public void setGRx(String D){this.Rx = D;}
-  
-  public String getWinningHash() {return WinningHash;}
-  public void setWinningHash (String WH){this.WinningHash = WH;}
 
   
   @Override
@@ -280,7 +277,7 @@ class WorkB {
 		return builder.toString();
 	}
 
-	private static String signData(String input) throws Exception {
+	private static String makeSHA256Digest(String input) throws Exception {
 
 		MessageDigest MD = MessageDigest.getInstance("SHA-256");
 		byte[] byteData = MD.digest(input.getBytes("UTF-8"));
@@ -297,6 +294,13 @@ class WorkB {
 		
 		return SHA256String;
 	}
+	private static String signSHA256(byte[] data, PrivateKey key) throws Exception {
+		Signature signer = Signature.getInstance("SHA1withRSA");
+		signer.initSign(key);
+		signer.update(data);
+		
+		return Base64.getEncoder().encodeToString(signer.sign());
+	}
 
 	public static BlockRecord Verify(BlockRecord inputBlock, int PID) throws Exception {
 		String concatString;  // Random seed string concatenated with the existing data
@@ -307,13 +311,14 @@ class WorkB {
 		Gson gson = new GsonBuilder().setPrettyPrinting().create();
 		
 		try {
-			for(int i=1; i<20; i++) { // change this to only solve while still unverified
-			//while blockchain doesn't contains current ID
+			for(int i=1; i<20; i++) { 
+			
 				randString = randomAlphaNumeric(8);
 
 				inputBlock.setBlockData(randString);
 				concatString = gson.toJson(inputBlock);
-				StringOut = signData(concatString);
+				StringOut = makeSHA256Digest(concatString);
+				
 				
 				System.out.println("Trying to Verify Input Block...\n");
 				System.out.println("Hash is: " + StringOut);
@@ -336,8 +341,9 @@ class WorkB {
 					System.out.println("The seed (puzzle answer) was: " + randString + "\n");
 					
 					inputBlock.setSHA256String(StringOut);
-					String hashInput = StringOut + PID;
-					inputBlock.setSignedSHA256(signData(hashInput));
+					String hashInput = StringOut;// + PID;//???
+					
+					inputBlock.setSignedSHA256(signSHA256(hashInput.getBytes(), Blockchain.keyPair.getPrivate()));
 					
 					return inputBlock;
 				}
@@ -424,6 +430,14 @@ class UnverifiedBlockConsumer implements Runnable {
 		this.queue = queue;
 		this.PID = PID;
 	}
+	
+	private boolean verifySig(byte[] data, PublicKey key, byte[] sig) throws Exception {
+		Signature signer = Signature.getInstance("SHA1withRSA");
+		signer.initVerify(key);
+		signer.update(data);
+    
+		return (signer.verify(sig));
+	}
 
 	public void run(){
 		BlockRecord data;
@@ -440,33 +454,40 @@ class UnverifiedBlockConsumer implements Runnable {
 				
 				//Do work
 				VerifiedBlock = WorkB.Verify(data, this.PID);
+
 				if(VerifiedBlock != null){
-					VerifiedBlock.setVerificationProcessID(Integer.toString(this.PID));
-					//Puzzle solzed
-
-					Gson gson = new GsonBuilder().setPrettyPrinting().create();
-
-					LinkedList <BlockRecord> BC = new LinkedList<BlockRecord>();
-					if(Blockchain.blockchain.length() > 0){
-						BC = gson.fromJson(Blockchain.blockchain, new TypeToken<LinkedList<BlockRecord>>(){}.getType());
-						VerifiedBlock.setPreviousHash(BC.getLast().getSHA256String());
-					}
-					else{
-						VerifiedBlock.setPreviousHash("Head Block");
-					}
+					byte[] Signature = Base64.getDecoder().decode(VerifiedBlock.getSignedSHA256());
+					boolean verifiedSig = verifySig(VerifiedBlock.getSHA256String().getBytes(), Blockchain.keyPair.getPublic(), Signature);
 					
-					//Add new block to front of blockchain
-					BC.add(VerifiedBlock);
-					NewBlockchain = gson.toJson(BC);
-				
-					for(int i = 0; i < Blockchain.numProcesses; i++){ // send to each process in group, including us:
-						sock = new Socket(Blockchain.serverName, Ports.BlockchainServerPortBase + i);
-						toServer = new PrintStream(sock.getOutputStream());
-
-						//Multicast new Blockchain
-						toServer.println(NewBlockchain); 
-						toServer.flush();
-						sock.close();
+					if(verifiedSig){
+					
+						VerifiedBlock.setVerificationProcessID(Integer.toString(this.PID));
+						//Puzzle solzed
+	
+						Gson gson = new GsonBuilder().setPrettyPrinting().create();
+	
+						LinkedList <BlockRecord> BC = new LinkedList<BlockRecord>();
+						if(Blockchain.blockchain.length() > 0){
+							BC = gson.fromJson(Blockchain.blockchain, new TypeToken<LinkedList<BlockRecord>>(){}.getType());
+							VerifiedBlock.setPreviousHash(BC.getLast().getSHA256String());
+						}
+						else{
+							VerifiedBlock.setPreviousHash("Head Block");
+						}
+						
+						//Add new block to front of blockchain
+						BC.add(VerifiedBlock);
+						NewBlockchain = gson.toJson(BC);
+					
+						for(int i = 0; i < Blockchain.numProcesses; i++){ // send to each process in group, including us:
+							sock = new Socket(Blockchain.serverName, Ports.BlockchainServerPortBase + i);
+							toServer = new PrintStream(sock.getOutputStream());
+	
+							//Multicast new Blockchain
+							toServer.println(NewBlockchain); 
+							toServer.flush();
+							sock.close();
+						}
 					}
 				}
 				Thread.sleep(1500); //Wait for our blockchain to be updated before processing a new block
@@ -550,17 +571,18 @@ public class Blockchain {
 	public static final int q_len = 6;
 	static String serverName = "localhost";
 	static String blockchain = "";
-	//static String pPrevHash = "Head Block";
 	static final int numProcesses = 3; // Set this to match your batch execution file that starts N processes with args 0,1,2,...N
 	static int PID;
-
+	public static KeyPair keyPair;
+	public static LinkedList<String> PublicKeys; // map to IDS
+	
 	//Multicast to each process
 	public void MultiSend(){
 		try{
 			//-------MultiCast Keys----------
 			System.out.println("BlockFramework multicasting process key to public key servers.\n\n");
-			String fakeKey = ("FakeKeyProcess: " + Blockchain.PID);
-			Multicast(Ports.KeyServerPortBase, fakeKey);
+			
+			Multicast(Ports.KeyServerPortBase, keyPair.getPublic().toString());
 
 			Thread.sleep(1000); // wait for keys to settle, normally would wait for an ack
 
@@ -570,7 +592,6 @@ public class Blockchain {
 			String current;
 			while(iterator.hasNext()){
 				current = iterator.next();
-				//System.out.println("BlockFramework multicasting unverified block string to unverified block servers.\n" + current + "\n");
 				current = current.replace("\n", "--linebreak--");
 				Multicast(Ports.UnverifiedBlockServerPortBase, "PID: " + Blockchain.PID + current);
 			}
@@ -579,6 +600,17 @@ public class Blockchain {
 			e.printStackTrace();
 		}
 	}
+	
+	private static KeyPair generateKeyPair(long seed) throws Exception {
+		KeyPairGenerator keyGenerator = KeyPairGenerator.getInstance("RSA");
+		SecureRandom rng = SecureRandom.getInstance("SHA1PRNG", "SUN");
+		rng.setSeed(seed);
+		keyGenerator.initialize(1024, rng);
+    
+		return (keyGenerator.generateKeyPair());
+	}
+	
+	
 
 	public static void Multicast(int port, String output) throws IOException {
 		Socket sock;
@@ -599,7 +631,17 @@ public class Blockchain {
 		System.out.println("Using processID " + PID + "\n");
 
 		final BlockingQueue<BlockRecord> queue = new PriorityBlockingQueue<>(); // Concurrent queue for unverified blocks
-		new Ports().setPorts(); // Establish OUR port number scheme, based on PID
+		PublicKeys = new LinkedList<String>();
+		
+		//------init ports------
+		new Ports().setPorts();
+		
+		//-------init keys-------
+		try{
+			keyPair = generateKeyPair(999);// Use a random seed in real life
+		}catch(Exception e){}
+		
+		
 
 		new Thread(new PublicKeyServer()).start();// New thread to process incoming public keys
 		new Thread(new UnverifiedBlockServer(queue)).start();// New thread to process incoming unverified blocks
