@@ -302,7 +302,7 @@ class WorkB {
 		String StringOut; // Will contain the new SHA256 string converted to HEX and printable.
 		int workNumber;
 
-		inputBlock.setPreviousHash(Blockchain.pPrevHash);
+		
 		Gson gson = new GsonBuilder().setPrettyPrinting().create();
 		
 		try {
@@ -333,17 +333,21 @@ class WorkB {
 				else if (workNumber < 20000) {
 					System.out.format("%d IS less than 20,000 so puzzle solved!\n", workNumber);
 					System.out.println("The seed (puzzle answer) was: " + randString + "\n");
+					inputBlock.setPreviousHash(Blockchain.pPrevHash);
 					inputBlock.setSHA256String(StringOut);
 					Blockchain.pPrevHash = StringOut;
 					
-					//String hashInput = inputBlock.getSHA256String() + PID;
 					String hashInput = StringOut + PID;
 					
+					Blockchain.numBlocksVerified++;
+					
 					inputBlock.setSignedSHA256(signData(hashInput));
+					
 					return inputBlock;
 				}
 				Thread.sleep(1000);
 			}
+			
 		} 
 		catch(Exception ex) {
 			ex.printStackTrace();
@@ -447,8 +451,6 @@ class UnverifiedBlockConsumer implements Runnable {
 					//Add new block to front of blockchain
 					Gson gson = new GsonBuilder().setPrettyPrinting().create();
 					NewBlockchain = gson.toJson(VerifiedBlock) + Blockchain.blockchain;
-					
-					Blockchain.numBlocksVerified++;
 				
 					for(int i = 0; i < Blockchain.numProcesses; i++){ // send to each process in group, including us:
 						sock = new Socket(Blockchain.serverName, Ports.BlockchainServerPortBase + i);
@@ -489,8 +491,11 @@ class BlockchainWorker extends Thread {
 			}
 			
 			System.out.println("Blockchain Server Received Updated Blockchain Ledger.");
-			//System.out.println("Total Verified Blocks: " + Blockchain.numBlocksVerified + "\n");
 			Blockchain.blockchain = data; // Would normally have to check first for winner before replacing.
+			
+			//updated prev hash... TERRIBLE HACK... but works for now.
+			int temp = data.indexOf("SHA256String")+16;
+			Blockchain.pPrevHash = data.substring(temp, temp+64);
 			
 			sock.close();
 			
@@ -498,7 +503,7 @@ class BlockchainWorker extends Thread {
 			if(this.PID == 0) {
 				Gson gson = new GsonBuilder().setPrettyPrinting().create();
 				// Write the JSON object to a file:
-				try (FileWriter writer = new FileWriter("blockRecord.json")) {
+				try (FileWriter writer = new FileWriter("BlockchainLedger.json")) {
 					gson.toJson(data, writer);
 					System.out.println("Blockchain Ledger Written to Disk.\n");
 				} 
@@ -624,6 +629,7 @@ public class Blockchain {
 				if(input == 'C'){
 					//Print validation credit of each process
 					System.out.println("Number of Verified Blocks: " + numBlocksVerified + "\n");
+					
 				}
 				else if(input == 'R'){
 					//?????
