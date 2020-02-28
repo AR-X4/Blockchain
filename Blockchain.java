@@ -36,6 +36,7 @@ import java.security.*;
 
 import java.time.Instant;
 import com.google.gson.*;
+import com.google.gson.reflect.TypeToken;
 
 //don't touch
 class Ports {
@@ -333,14 +334,9 @@ class WorkB {
 				else if (workNumber < 20000) {
 					System.out.format("%d IS less than 20,000 so puzzle solved!\n", workNumber);
 					System.out.println("The seed (puzzle answer) was: " + randString + "\n");
-					inputBlock.setPreviousHash(Blockchain.pPrevHash);
+					
 					inputBlock.setSHA256String(StringOut);
-					Blockchain.pPrevHash = StringOut;
-					
 					String hashInput = StringOut + PID;
-					
-					Blockchain.numBlocksVerified++;
-					
 					inputBlock.setSignedSHA256(signData(hashInput));
 					
 					return inputBlock;
@@ -448,9 +444,20 @@ class UnverifiedBlockConsumer implements Runnable {
 					VerifiedBlock.setVerificationProcessID(Integer.toString(this.PID));
 					//Puzzle solzed
 
-					//Add new block to front of blockchain
 					Gson gson = new GsonBuilder().setPrettyPrinting().create();
-					NewBlockchain = gson.toJson(VerifiedBlock) + Blockchain.blockchain;
+
+					LinkedList <BlockRecord> BC = new LinkedList<BlockRecord>();
+					if(Blockchain.blockchain.length() > 0){
+						BC = gson.fromJson(Blockchain.blockchain, new TypeToken<LinkedList<BlockRecord>>(){}.getType());
+						VerifiedBlock.setPreviousHash(BC.getLast().getSHA256String());
+					}
+					else{
+						VerifiedBlock.setPreviousHash("Head Block");
+					}
+					
+					//Add new block to front of blockchain
+					BC.add(VerifiedBlock);
+					NewBlockchain = gson.toJson(BC);
 				
 					for(int i = 0; i < Blockchain.numProcesses; i++){ // send to each process in group, including us:
 						sock = new Socket(Blockchain.serverName, Ports.BlockchainServerPortBase + i);
@@ -471,7 +478,6 @@ class UnverifiedBlockConsumer implements Runnable {
 	}
 }
 
-// Incoming proposed replacement blockchains. Compare to existing. Replace if winner:
 class BlockchainWorker extends Thread {
 	private Socket sock;
 	private int PID;
@@ -492,10 +498,6 @@ class BlockchainWorker extends Thread {
 			
 			System.out.println("Blockchain Server Received Updated Blockchain Ledger.");
 			Blockchain.blockchain = data; // Would normally have to check first for winner before replacing.
-			
-			//updated prev hash... TERRIBLE HACK... but works for now.
-			int temp = data.indexOf("SHA256String")+16;
-			Blockchain.pPrevHash = data.substring(temp, temp+64);
 			
 			sock.close();
 			
@@ -546,10 +548,9 @@ class BlockchainServer implements Runnable {
 public class Blockchain {
 
 	public static final int q_len = 6;
-	public static int numBlocksVerified = 0;
 	static String serverName = "localhost";
-	static String blockchain = "";//"[First block]";
-	static String pPrevHash = "Head Block";
+	static String blockchain = "";
+	//static String pPrevHash = "Head Block";
 	static final int numProcesses = 3; // Set this to match your batch execution file that starts N processes with args 0,1,2,...N
 	static int PID;
 
@@ -562,10 +563,6 @@ public class Blockchain {
 			Multicast(Ports.KeyServerPortBase, fakeKey);
 
 			Thread.sleep(1000); // wait for keys to settle, normally would wait for an ack
-
-			//-------MultiCast JSON BlockChain Ledger---------
-			System.out.println("BlockFramework multicasting blockchain string to blockchain servers.\n\n");
-			Multicast(Ports.BlockchainServerPortBase, blockchain);
 
 			//-------MultiCast UV Blocks----------
 			LinkedList<String> JsonRecord = BlockInput.GetJsonListString(PID);
@@ -628,8 +625,22 @@ public class Blockchain {
 				input = (char)in.read();
 				if(input == 'C'){
 					//Print validation credit of each process
-					System.out.println("Number of Verified Blocks: " + numBlocksVerified + "\n");
+					LinkedList <BlockRecord> BC = new LinkedList<BlockRecord>();
+					Gson gson = new Gson();
+					BC = gson.fromJson(Blockchain.blockchain, new TypeToken<LinkedList<BlockRecord>>(){}.getType());
 					
+					BlockRecord temp;
+					for(int i = 0; i < numProcesses; i++){
+						int numVerifications = 0;
+						Iterator<BlockRecord> iterator = BC.iterator();
+						while(iterator.hasNext()){
+							temp = iterator.next();
+							if(temp.getVerificationProcessID().equals(Integer.toString(i))){
+								numVerifications++;
+							}
+						} 
+						System.out.println("Process " + i + ": " + numVerifications + " Blocks Verified.\n");
+					}
 				}
 				else if(input == 'R'){
 					//?????
