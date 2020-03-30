@@ -20,10 +20,14 @@ https://repo1.maven.org/maven2/com/google/code/gson/gson/2.8.2/
 
 Need to download gson-2.8.2.jar into your classpath / compiling directory.
 
-To compile and run:
+To compile:
 
 javac -cp "gson-2.8.2.jar" Blockchain.java
-java -cp ".;gson-2.8.2.jar" Blockchain
+Or run compileBlockchain.bat
+
+To Run:
+
+Run runBlockchainMaster.bat
 
 -----------------------------------------------------------------------------------------------------*/
 
@@ -33,12 +37,10 @@ import java.net.*;
 import java.util.concurrent.*;
 import java.lang.reflect.Type;
 import java.security.*;
-
 import java.time.Instant;
 import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 
-//don't touch
 class Ports {
 	protected static int KeyServerPortBase = 4710;
 	protected static int UnverifiedBlockServerPortBase = 4820;
@@ -54,7 +56,7 @@ class Ports {
 		BlockchainServerPort = BlockchainServerPortBase + Blockchain.PID;
 	}
 }
-//don't touch
+
 class PublicKeyWorker extends Thread {
 	private Socket sock;
 	PublicKeyWorker (Socket s) {
@@ -177,7 +179,6 @@ class BlockRecord implements Comparable {
   }
 }
 
-//change collection
 class BlockInput {
 
 	private static String FILENAME;
@@ -526,7 +527,7 @@ class BlockchainWorker extends Thread {
 		}
 	}
 }
-//do not touch
+
 class BlockchainServer implements Runnable {
 	private int PID;
 	
@@ -675,15 +676,6 @@ public class Blockchain {
 						} 
 						System.out.println("Process " + i + ": " + numVerifications + " Blocks Verified.\n");
 					}
-				}
-				//else if(input == 'R'){
-					//?????
-				//}
-				else if(input == 'V'){
-					//Validiate entire blockchain
-					
-					
-					
 				}
 				else if(input == 'L'){
 					String tmp = blockchain.replace("}", "\n\n");
